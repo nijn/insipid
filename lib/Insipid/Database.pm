@@ -127,9 +127,16 @@ sub dbupgrade {
 			$sth->execute();
 			
 			# Now we populate an ordered list (to find dupes), and a hash 
-			# (for the votes)
+			# (for the votes).  We can do it in one pass by tracking the
+			# current dupe.
 			my @tagnames;
 			my %tagvotes;
+			
+			while(my @row = $sth->fetchrow()) {
+				push @tagnames, $row[0];
+				$tagvotes{$row[0]} = $row[1];
+				#print STDERR "$row[0]\n";
+			}
 				   
 		}
 	}	
