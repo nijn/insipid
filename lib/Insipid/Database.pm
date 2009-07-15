@@ -74,8 +74,10 @@ sub export_options {
 }
 
 sub dbupgrade {
-	my $sql = "update $tbl_options set value = ? where (name = ?)";
-	my $sth = $dbh->prepare($sql);
+	my ($sql, $sth);
+
+	$sql = "update $tbl_options set value = ? where (name = ?)";
+	$sth = $dbh->prepare($sql);
 	$sth->execute($version, 'version');
 
 	$sql = "insert into $tbl_options(name, value, description) 
@@ -99,6 +101,38 @@ sub dbupgrade {
 	if($dbh->errstr) {
 		print STDERR $dbh->errstr;
 	}
+
+	# For Postgresql we have to do some horrible magic to get all of the
+	# tags to be case-insensitive.
+	if($dbtype eq 'Pg') {
+		$sql = "create unique index lower_name_idx ON $tbl_tags ((lower(name)))";
+		$sth = $dbh->prepare($sql);
+		$sth->execute();
+		
+		if($dbh->errstr =~ /duplicated values/) {
+			print STDERR "Coalescing the tags.\n";
+		
+			# Now for the tricky part of collapsing the tags. 
+			# First we find all duplicates, then update the one with *less*
+			# candidates to the title with the *most* candidates
+			$sql = "select $tbl_tags.name, count(*) 
+				   from $tbl_bookmarks  
+				   inner join $tbl_bookmark_tags on
+					($tbl_bookmarks.id = $tbl_bookmark_tags.bookmark_id)
+				   inner join $tbl_tags on
+					($tbl_tags.id = $tbl_bookmark_tags.tag_id)
+				   group by $tbl_tags.name
+				   order by $tbl_tags.name";
+			$sth = $dbh->prepare($sql);
+			$sth->execute();
+			
+			# Now we populate an ordered list (to find dupes), and a hash 
+			# (for the votes)
+			my @tagnames;
+			my %tagvotes;
+				   
+		}
+	}	
 	
 	return;
 }
@@ -109,6 +143,9 @@ sub get_option {
 	if(keys (%options) == 0) {
 		reload_options();
 	}
+	
+	# FORCE UPGRADE FOR DEV WORK
+	dbupgrade();
 
 	# Determine if we need to upgrade the database
 	if($version ne $options{'version'}) {

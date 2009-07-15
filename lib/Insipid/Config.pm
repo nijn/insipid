@@ -95,8 +95,6 @@ $tbl_options			= $dbprefix . 'options';
 $tbl_pagecache			= $dbprefix . 'pagecache';
 $tbl_pagecache_references	= $dbprefix . 'pagecache_references';
 
-
-
 1;
 
 __END__
